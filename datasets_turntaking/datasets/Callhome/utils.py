@@ -1,43 +1,87 @@
 import glob
 import os 
 from os.path import join, exists, basename
-from datasets_turntaking.utils import read_txt
-import json as json
-from sklearn.model_selection import train_test_split
-import numpy as np
-from datasets_turntaking.dataset.callhome.utils import load_utterances
-import soundfile as sf
-from datasets_turntaking.utils import read_txt
 import re
+import json as json
+import numpy as np
+import soundfile as sf
 
+from datasets_turntaking.utils import read_txt
 
+def callhome_regexp(s):
+    """callhome specific regexp"""
+    # {text}:  sound made by the talker {laugh} {cough} {sneeze} {breath}
+    s = re.sub(r"\{.*\}", "", s)
 
-def load_data(lang):
-    audio_path = os.path.join("/data/group1/z40351r/datasets_turntaking/data", "Callhome", lang, "data_full")
-    text_path = "/data/group1/z40351r/datasets_turntaking/data/Callhome/" + lang + "/transcript"
+    # [[text]]: comment; most often used to describe unusual
+    s = re.sub(r"\[\[.*\]\]", "", s)
 
-    if not exists(text_path):
-        raise FileNotFoundError(f"text_path not found: {text_path}")
+    # [text]: sound not made by the talker (background or channel) [distortion]    [background noise]      [buzz]
+    s = re.sub(r"\[.*\]", "", s)
+
+    # (( )): unintelligible; can't even guess text
+    s = re.sub(r"\(\(\s*\)\)", "", s)
+
+    # single word ((taiwa))
+    # ((text)): unintelligible; text is best guess at transcription ((coffee klatch))
+    s = re.sub(r"\(\((\w*)\)\)", r"\1", s)
+
+    # multi word ((taiwa and other))
+    # s = re.sub(r"\(\((\w*)\)\)", r"\1", s)
+    s = re.sub(r"\(\(", "", s)
+    s = re.sub(r"\)\)", "", s)
+
+    # -text / text-: partial word = "-tion absolu-"
+    s = re.sub(r"\-(\w+)", r"\1", s)
+    s = re.sub(r"(\w+)\-", r"\1", s)
+
+    # +text+: mispronounced word (spell it in usual orthography) +probably+
+    s = re.sub(r"\+(\w*)\+", r"\1", s)
+
+    # **text**: idiosyncratic word, not in common use
+    s = re.sub(r"\*\*(\w*)\*\*", r"\1", s)
+
+    # remove proper names symbol
+    s = re.sub(r"\&(\w+)", r"\1", s)
+
+    # remove non-lexemes symbol
+    s = re.sub(r"\%(\w+)", r"\1", s)
+
+    # text --             marks end of interrupted turn and continuation
+    # -- text             of same turn after interruption, e.g.
+    s = re.sub(r"\-\-", "", s)
+
+    # <language text>: speech in another language
+    s = re.sub(r"\<\w*\s(\w*\s*\w*)\>", r"\1", s)
+
+    # remove double spacing on last
+    s = re.sub(r"\s\s+", " ", s)
+    s = re.sub(r"^\s", "", s)
+    return s
+
+def load_data(audio_dir, text_dir):
+    if not exists(text_dir):
+        raise FileNotFoundError(f"text_path not found: {text_dir}")
 
     dataset = []
-    for file in os.listdir(audio_path):
+    for file in os.listdir(audio_dir):
         if file.endswith(".wav"):
-            sample = {"audio_path": join(audio_path, file)}
-            txt = join(text_path, file.replace(".wav", ".cha"))
+            sample = {"audio_path": join(audio_dir, file)}
+            txt = join(text_dir, file.replace(".wav", ".cha"))
             if exists(txt):
                 sample["text"] = txt
             dataset.append(sample)
     return dataset
 
 
-def get_member_num(filepath):
-    member = 0
+def get_speaker_num(filepath):
+    num = 0
     for row in read_txt(filepath):
         if row.startswith("@ID"):
-            member += 1
+            num += 1
         elif row[0]=="*":
             break
-    return member
+    return num
 
 def preprocess_utterance(filepath):
     """
@@ -48,19 +92,11 @@ def preprocess_utterance(filepath):
     """
     data = []
     speak = False
-    print(read_txt(filepath))
     for row in read_txt(filepath):
         # omit empty rows and rows starting with '#' (global file info)
         if row == "" or row.startswith("#"):
             continue
-
-        # Some utterances span multiple rows:
-        # i.e. evaltest/en_6467.txt
-        #
-        # 462.58 468.59 B: That's were, that's where I guess, they would, %um, they
-        # get involved in initial public offering, stock offerings
-        #if row[0].isdigit():
-        if row.startswith("@"):
+        elif row.startswith("@"):
             continue
         elif row.startswith("%"):
             continue
@@ -115,6 +151,9 @@ def load_utterances(filepath, clean=True):
     script_end = list(map(int, list(time_stamp[0])))[1]
     return script_start, script_end, utterances
 
-    # except:
-    #     print(f"ERROR on split {filepath}")
-    #     raise(aa)
+def extract_vad(utterances):
+    vad = [[], []]
+    for utt in utterances:
+        print(utt)
+        vad[utt["speaker"]].append((utt["start"], utt["end"]))
+    return vad

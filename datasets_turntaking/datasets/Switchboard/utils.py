@@ -2,7 +2,6 @@ from os.path import join
 import re
 
 import sys
-sys.path.append('../../../../')
 from datasets_turntaking.utils import read_txt
 
 OmitText = [
