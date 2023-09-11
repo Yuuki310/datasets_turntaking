@@ -1,6 +1,6 @@
 # Custom
 outputs/
-data/
+data/*
 tmp/
 exp/
 .out
