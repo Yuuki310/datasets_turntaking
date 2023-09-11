@@ -5,7 +5,6 @@ tmp/
 exp/
 .out
 wandb/
-data/
 pyrightconfig.json
 runs/
 lightning_logs/
