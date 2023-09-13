@@ -20,7 +20,7 @@ REL_AUDIO_PATH = os.path.join(
 )
 SPLIT_PATH = os.path.join(repo_root(), "datasets_turntaking/datasets/Switchboard/split")
 
-vad_dir = "/data/group1/z40351r/datasets_turntaking/data/Switchboard/vad"
+vad_dir = os.path.join(repo_root(), "datasets_turntaking/datasets/Switchboard/vad")
 
 if __name__ == "__main__":
     alignmets_path = "/data/group1/z40351r/datasets_turntaking/data/Switchboard/word_alignments"
